@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#244f38" />
+    <title>Aevi 家庭斗地主</title>
+    <link rel="preload" as="image" href="/doudizhu/assets/themes/theme-jade.png" />
+    <link rel="stylesheet" href="/doudizhu/game.css?v=20260715ddz16" />
+  </head>
+  <body data-theme="jade">
+    <main id="game" aria-live="polite"></main>
+    <div id="effects" aria-hidden="true"></div>
+    <canvas id="particleCanvas" aria-hidden="true"></canvas>
+    <audio id="musicPlayer" preload="auto" loop></audio>
+    <audio id="soundBomb" preload="auto" src="/doudizhu/assets/sfx/bomb.wav"></audio>
+    <audio id="soundSelect" preload="auto" src="/doudizhu/assets/sfx/select.ogg"></audio>
+    <audio id="soundToast" preload="auto" src="/doudizhu/assets/sfx/toast.ogg"></audio>
+    <script defer src="/doudizhu/game.js?v=20260715ddz16"></script>
+  </body>
+</html>
