@@ -66,6 +66,88 @@
     return state && state.players ? state.players.find(function (player) { return player.id === id; }) : null;
   }
 
+  function matchTranscript() {
+    return state && state.match && Array.isArray(state.match.chatTranscript) ? state.match.chatTranscript : [];
+  }
+
+  function transcriptTime(value) {
+    var date = new Date(value || 0);
+    if (!Number.isFinite(date.getTime())) return "--:--";
+    return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+
+  function transcriptPlayerName(item) {
+    var player = playerById(item.playerId);
+    return item.playerName || player && player.name || item.playerId || "未知玩家";
+  }
+
+  function transcriptGroups() {
+    var groups = [];
+    matchTranscript().forEach(function (item) {
+      var round = Math.max(1, Number(item.round) || 1);
+      var group = groups.length && groups[groups.length - 1].round === round ? groups[groups.length - 1] : null;
+      if (!group) {
+        group = { round: round, items: [] };
+        groups.push(group);
+      }
+      group.items.push(item);
+    });
+    return groups;
+  }
+
+  function renderMatchTranscript() {
+    if (state.phase !== "match_end") return "";
+    var items = matchTranscript();
+    var content = items.length
+      ? transcriptGroups().map(function (group) {
+          return '<section class="match-transcript-round"><h3>第 ' + escapeHtml(group.round) + ' 局</h3>' + group.items.map(function (item) {
+            return '<div class="match-transcript-row"><time>' + escapeHtml(transcriptTime(item.at)) + '</time><strong>' + escapeHtml(transcriptPlayerName(item)) + '</strong><span>' + escapeHtml(item.text) + '</span></div>';
+          }).join("") + "</section>";
+        }).join("")
+      : '<p class="match-transcript-empty">本场没人说话。</p>';
+    return '<section class="match-transcript" aria-label="本场聊天记录"><header><strong>本场聊天记录</strong><span>' + escapeHtml(items.length) + ' 条</span></header><div class="match-transcript-list">' + content + "</div></section>";
+  }
+
+  function transcriptCopyText() {
+    var items = matchTranscript();
+    var lines = ["家庭斗地主 · 本场聊天记录", "共 " + items.length + " 条"];
+    var activeRound = 0;
+    items.forEach(function (item) {
+      var round = Math.max(1, Number(item.round) || 1);
+      if (round !== activeRound) {
+        activeRound = round;
+        lines.push("", "第 " + round + " 局");
+      }
+      lines.push("[" + transcriptTime(item.at) + "] " + transcriptPlayerName(item) + "：" + String(item.text || ""));
+    });
+    if (!items.length) lines.push("", "本场没人说话。");
+    return lines.join("\n");
+  }
+
+  function fallbackCopyText(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    var copied = document.execCommand("copy");
+    area.remove();
+    if (!copied) throw new Error("复制失败");
+  }
+
+  async function copyMatchTranscript() {
+    try {
+      var text = transcriptCopyText();
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else fallbackCopyText(text);
+      showNotice("聊天记录已复制");
+    } catch (_) {
+      showError("复制失败，请稍后再试");
+    }
+  }
+
   function eventAge(event) {
     return Date.now() - new Date(event.at || 0).getTime();
   }
@@ -235,7 +317,7 @@
       state.players.map(function (player) {
         return '<div class="result-score"><span>' + escapeHtml(player.name) + "</span><strong>" + escapeHtml(signed(result.scoreDelta[player.id])) + "</strong></div>";
       }).join("") +
-      '</div><button class="start-button" type="button" ' + (state.phase === "match_end" ? 'data-return-lobby="true">整场结束' : 'data-next-round="true">下一局') + "</button></section></div>"
+      '</div>' + renderMatchTranscript() + '<div class="result-actions">' + (state.phase === "match_end" ? '<button class="result-copy-button" type="button" data-copy-transcript="true">复制聊天记录</button>' : "") + '<button class="start-button" type="button" ' + (state.phase === "match_end" ? 'data-return-lobby="true">整场结束' : 'data-next-round="true">下一局') + "</button></div></section></div>"
     );
   }
 
@@ -344,6 +426,17 @@
     document.body.appendChild(node);
     toastTimer = window.setTimeout(function () { node.remove(); }, 2900);
     playAudio(soundToast, 0.8);
+  }
+
+  function showNotice(message) {
+    window.clearTimeout(toastTimer);
+    var old = document.querySelector(".error-toast");
+    if (old) old.remove();
+    var node = document.createElement("div");
+    node.className = "error-toast success";
+    node.textContent = message || "已完成";
+    document.body.appendChild(node);
+    toastTimer = window.setTimeout(function () { node.remove(); }, 2400);
   }
 
   function playAudio(element, scale) {
@@ -979,6 +1072,10 @@
     }
     if (button.hasAttribute("data-next-round")) {
       postAction({ type: "start_next_round" }).catch(function () {});
+      return;
+    }
+    if (button.hasAttribute("data-copy-transcript")) {
+      copyMatchTranscript();
       return;
     }
     if (button.hasAttribute("data-return-lobby")) {

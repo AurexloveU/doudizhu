@@ -28,6 +28,7 @@ const THEMES = ["jade", "sakura", "camp", "beach"];
 const TURN_MS = 15_000;
 const RATE_LIMIT_MS = 5_000;
 const MAX_FEED = 120;
+const MAX_CHAT_TRANSCRIPT = 1_000;
 const MAX_HISTORY = 240;
 const ROSTER_IDS = ["aurex", "aevi", "vex", "juhua"];
 
@@ -170,11 +171,46 @@ function defaultState() {
   };
 }
 
+function transcriptFromFeed(feed = [], fallbackRound = 1) {
+  const items = Array.isArray(feed) ? feed : [];
+  const firstRoundStart = items.find((item) => item?.type === "round_start" && Number(item.round) > 0);
+  let currentRound = firstRoundStart ? Math.max(1, Number(firstRoundStart.round) - 1) : Math.max(1, Number(fallbackRound) || 1);
+  const transcript = [];
+  for (const item of items) {
+    if (item?.type === "round_start" && Number(item.round) > 0) currentRound = Number(item.round);
+    if (item?.type !== "chat") continue;
+    transcript.push({
+      id: item.id,
+      round: Number(item.round) > 0 ? Number(item.round) : currentRound,
+      playerId: item.playerId,
+      playerName: item.playerName,
+      text: item.text,
+      at: item.at,
+    });
+  }
+  return transcript;
+}
+
+function normalizeChatTranscript(rawTranscript, feed, fallbackRound) {
+  const source = Array.isArray(rawTranscript) ? rawTranscript : transcriptFromFeed(feed, fallbackRound);
+  return source
+    .filter((item) => item && ROSTER_IDS.includes(item.playerId) && cleanText(item.text, 80))
+    .map((item) => ({
+      id: cleanText(item.id, 100) || `chat_${randomUUID()}`,
+      round: Math.max(1, Number(item.round) || Number(fallbackRound) || 1),
+      playerId: item.playerId,
+      playerName: cleanText(item.playerName, 18),
+      text: firstChars(cleanText(item.text, 80), 10),
+      at: cleanText(item.at, 64) || nowIso(),
+    }))
+    .slice(-MAX_CHAT_TRANSCRIPT);
+}
+
 function normalizeState(raw = {}) {
   raw = raw || {};
   const base = defaultState();
   const phase = ["lobby", "bid", "play", "round_end", "match_end", "dissolve_vote"].includes(raw.phase) ? raw.phase : "lobby";
-  return {
+  const normalized = {
     ...base,
     ...raw,
     version: 1,
@@ -185,6 +221,13 @@ function normalizeState(raw = {}) {
     timer: null,
     updatedAt: raw.updatedAt || base.updatedAt,
   };
+  if (normalized.match) {
+    normalized.match = {
+      ...normalized.match,
+      chatTranscript: normalizeChatTranscript(raw.match?.chatTranscript, normalized.feed, normalized.match.roundNumber),
+    };
+  }
+  return normalized;
 }
 
 async function readJson(filePath, fallback) {
@@ -328,6 +371,17 @@ export class DoudizhuService {
     return this.state.match?.scoreDeltas || scoreDeltaTemplate(this.activePlayerIds());
   }
 
+  matchTranscript() {
+    return (this.state.match?.chatTranscript || []).map((item) => ({
+      id: item.id,
+      round: item.round,
+      playerId: item.playerId,
+      playerName: item.playerName || this.profile(item.playerId)?.name || item.playerId,
+      text: item.text,
+      at: item.at,
+    }));
+  }
+
   leaderboard() {
     return ROSTER_IDS.map((id) => ({
       id,
@@ -375,6 +429,7 @@ export class DoudizhuService {
             playerIds: this.activePlayerIds(),
             scoreDeltas: matchDeltas,
             createdAt: this.state.match.createdAt,
+            chatTranscript: this.state.phase === "match_end" ? this.matchTranscript() : [],
           }
         : null,
       round: round
@@ -448,6 +503,7 @@ export class DoudizhuService {
         roundNumber: 1,
         initialDealerIndex: dealerIndex,
         scoreDeltas: scoreDeltaTemplate(playerIds),
+        chatTranscript: [],
         status: "playing",
         createdAt: nowIso(),
       },
@@ -975,7 +1031,20 @@ export class DoudizhuService {
       text = firstChars(text, 10);
     }
     if (!skipRateLimit) this.rateLimitBucket("chat", playerId);
-    await this.addFeed({ type: "chat", playerId, text }, persist);
+    const chat = {
+      id: `chat_${randomUUID()}`,
+      round: Math.max(1, Number(this.state.match?.roundNumber || this.state.round?.number || 1)),
+      playerId,
+      playerName: this.profile(playerId)?.name || playerId,
+      text,
+      at: nowIso(),
+    };
+    if (this.state.match) {
+      const transcript = Array.isArray(this.state.match.chatTranscript) ? this.state.match.chatTranscript : [];
+      transcript.push(chat);
+      this.state.match.chatTranscript = transcript.slice(-MAX_CHAT_TRANSCRIPT);
+    }
+    await this.addFeed({ ...chat, type: "chat" }, persist);
     if (persist) this.broadcast();
     if (persist && playerId === "aurex") {
       for (const target of this.activePlayerIds().filter((id) => id !== playerId && this.playerConfig(id)?.kind === "cmd")) {

@@ -637,6 +637,20 @@ body::after {
 .result-score { padding: 12px 6px; border-radius: 16px; background: rgba(255,255,255,.07); }
 .result-score strong { display: block; font-size: 22px; }
 .result-score span { color: var(--muted); font-size: 11px; }
+.match-transcript { overflow: hidden; margin: 16px 0; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(0,0,0,.2); text-align: left; }
+.match-transcript > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.match-transcript > header strong { color: var(--gold); font-size: 14px; }
+.match-transcript > header span { color: var(--muted); font-size: 11px; }
+.match-transcript-list { max-height: min(34vh, 300px); overflow: auto; padding: 4px 14px 12px; overscroll-behavior: contain; }
+.match-transcript-round h3 { position: sticky; top: 0; z-index: 1; margin: 0 -2px 4px; padding: 10px 2px 5px; color: #d8eadf; background: rgba(17, 27, 24, .96); font-size: 11px; }
+.match-transcript-row { display: grid; grid-template-columns: 42px minmax(58px, auto) 1fr; align-items: baseline; gap: 7px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 12px; }
+.match-transcript-row time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.match-transcript-row strong { overflow: hidden; max-width: 120px; color: #fff2c5; text-overflow: ellipsis; white-space: nowrap; }
+.match-transcript-row span { overflow-wrap: anywhere; color: var(--ink); }
+.match-transcript-empty { margin: 0; padding: 24px 0 12px; color: var(--muted); text-align: center; }
+.result-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.result-actions .start-button { min-width: 150px; }
+.result-copy-button { min-width: 150px; padding: 12px 20px; border: 1px solid rgba(255,215,119,.5); border-radius: 999px; color: #ffe8a5; background: rgba(255,215,119,.09); font-weight: 900; cursor: pointer; }
 
 .dissolve-banner {
   position: absolute;
@@ -672,6 +686,7 @@ body::after {
   font-weight: 900;
   animation: toast-in 2.8s ease both;
 }
+.error-toast.success { background: rgba(34, 122, 78, .96); }
 
 #effects,
 #particleCanvas {

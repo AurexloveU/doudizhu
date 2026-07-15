@@ -129,6 +129,63 @@ async function cleanup(service, dataDir) {
 {
   const { service, dataDir } = await createService();
   try {
+    await service.startMatch(4, ["aevi", "vex"]);
+    service.clearTimers();
+    await service.applyChat("aurex", "第一局好险", { skipRateLimit: true });
+    service.state.match.roundNumber = 2;
+    service.state.round.number = 2;
+    await service.applyChat("aevi", "第二局加油", { skipRateLimit: true });
+    await service.applyEmote("vex", "emoji_01", { skipRateLimit: true });
+    assert.equal(service.state.match.chatTranscript.length, 2, "本场记录只应收集文字聊天");
+    assert.deepEqual(service.state.match.chatTranscript.map((item) => item.round), [1, 2]);
+    assert.deepEqual(service.state.match.chatTranscript.map((item) => item.text), ["第一局好险", "第二局加油"]);
+    assert.equal(service.publicSnapshot("aurex").match.chatTranscript.length, 0, "整场结束前不应弹出结算聊天记录");
+    service.state.phase = "match_end";
+    const finalSnapshot = service.publicSnapshot("aurex");
+    assert.deepEqual(finalSnapshot.match.chatTranscript.map((item) => item.playerName), ["Aurex", "Aevi"]);
+    const persisted = JSON.parse(await fs.readFile(path.join(dataDir, "state.json"), "utf8"));
+    assert.equal(persisted.match.chatTranscript.length, 2, "聊天记录必须随牌局状态持久化");
+  } finally {
+    await cleanup(service, dataDir);
+  }
+}
+
+{
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "aevi-ddz-chat-migrate-"));
+  const at = "2026-07-16T08:00:00.000Z";
+  await fs.writeFile(path.join(dataDir, "state.json"), JSON.stringify({
+    version: 1,
+    phase: "match_end",
+    match: {
+      id: "legacy-match",
+      totalRounds: 4,
+      roundNumber: 2,
+      playerIds: ["aurex", "aevi", "vex"],
+      scoreDeltas: { aurex: 0, aevi: 0, vex: 0 },
+      status: "completed",
+      createdAt: at,
+    },
+    feed: [
+      { id: "round-1", type: "round_start", round: 1, at },
+      { id: "chat-1", type: "chat", playerId: "aurex", text: "旧第一局", at },
+      { id: "round-2", type: "round_start", round: 2, at },
+      { id: "emote-1", type: "emote", playerId: "vex", text: "表情", at },
+      { id: "chat-2", type: "chat", playerId: "aevi", text: "旧第二局", at },
+    ],
+  }));
+  const service = new DoudizhuService({ rootDir: process.cwd(), dataDir, adapter: new FakeAdapter() });
+  await service.ready();
+  try {
+    const transcript = service.publicSnapshot("aurex").match.chatTranscript;
+    assert.deepEqual(transcript.map((item) => [item.round, item.text]), [[1, "旧第一局"], [2, "旧第二局"]], "升级时应从旧事件恢复当前牌局聊天");
+  } finally {
+    await cleanup(service, dataDir);
+  }
+}
+
+{
+  const { service, dataDir } = await createService();
+  try {
     await service.startMatch(8, ["aevi", "juhua"]);
     assert.deepEqual(service.state.match.playerIds, ["aurex", "aevi", "juhua"]);
     assert.deepEqual(Object.keys(service.state.round.hands), ["aurex", "aevi", "juhua"]);
