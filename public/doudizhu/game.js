@@ -19,6 +19,8 @@
   var settingsOpen = false;
   var interactionOpen = false;
   var chatOpen = false;
+  var resultOpen = true;
+  var transcriptExpanded = false;
   var targetId = "aevi";
   var cardGesture = null;
   var suppressCardClickUntil = 0;
@@ -81,9 +83,9 @@
     return item.playerName || player && player.name || item.playerId || "未知玩家";
   }
 
-  function transcriptGroups() {
+  function transcriptGroups(items) {
     var groups = [];
-    matchTranscript().forEach(function (item) {
+    (items || []).forEach(function (item) {
       var round = Math.max(1, Number(item.round) || 1);
       var group = groups.length && groups[groups.length - 1].round === round ? groups[groups.length - 1] : null;
       if (!group) {
@@ -97,15 +99,20 @@
 
   function renderMatchTranscript() {
     if (state.phase !== "match_end") return "";
-    var items = matchTranscript();
+    var allItems = matchTranscript();
+    var items = transcriptExpanded ? allItems : allItems.slice(-6);
     var content = items.length
-      ? transcriptGroups().map(function (group) {
+      ? transcriptGroups(items).map(function (group) {
           return '<section class="match-transcript-round"><h3>第 ' + escapeHtml(group.round) + ' 局</h3>' + group.items.map(function (item) {
             return '<div class="match-transcript-row"><time>' + escapeHtml(transcriptTime(item.at)) + '</time><strong>' + escapeHtml(transcriptPlayerName(item)) + '</strong><span>' + escapeHtml(item.text) + '</span></div>';
           }).join("") + "</section>";
         }).join("")
       : '<p class="match-transcript-empty">本场没人说话。</p>';
-    return '<section class="match-transcript" aria-label="本场聊天记录"><header><strong>本场聊天记录</strong><span>' + escapeHtml(items.length) + ' 条</span></header><div class="match-transcript-list">' + content + "</div></section>";
+    var countLabel = allItems.length + " 条" + (!transcriptExpanded && allItems.length > items.length ? " · 最近 " + items.length + " 条" : "");
+    var toggle = allItems.length > 6
+      ? '<button class="transcript-toggle" type="button" data-toggle-transcript="true">' + (transcriptExpanded ? "收起记录" : "展开全部 " + allItems.length + " 条") + "</button>"
+      : "";
+    return '<section class="match-transcript' + (transcriptExpanded ? " is-expanded" : "") + '" aria-label="本场聊天记录"><header><strong>' + (transcriptExpanded ? "按局记录" : "本场聊天记录") + '</strong><span>' + escapeHtml(countLabel) + '</span></header><div class="match-transcript-list">' + content + "</div>" + toggle + "</section>";
   }
 
   function transcriptCopyText() {
@@ -308,17 +315,22 @@
   }
 
   function renderResultPanel() {
-    if (!state.round || !state.round.result || ["round_end", "match_end"].indexOf(state.phase) < 0) return "";
+    if (!resultOpen || !state.round || !state.round.result || ["round_end", "match_end"].indexOf(state.phase) < 0) return "";
     var result = state.round.result;
     var winner = playerById(result.winnerId) || { name: result.winnerId };
     var tag = result.spring ? "春天 ×2" : result.antiSpring ? "反春天 ×2" : "本局结算";
     return (
-      '<div class="modal-backdrop"><section class="result-panel glass"><span class="result-kicker">' + escapeHtml(tag) + "</span><h2>" + escapeHtml(winner.name) + " 赢了</h2><p>底分 " + escapeHtml(result.bidScore) + " · 炸弹 " + escapeHtml(result.bombCount) + " · 最终倍数 " + escapeHtml(result.multiplier) + '</p><div class="result-score-grid">' +
+      '<div class="modal-backdrop result-backdrop" data-close-result="true"><section class="result-panel glass' + (transcriptExpanded ? " transcript-expanded" : "") + '" data-result-stop="true"><header class="result-panel-head"><span aria-hidden="true"></span><div><span class="result-kicker">' + escapeHtml(transcriptExpanded ? "整场回顾" : tag) + "</span><h2>" + escapeHtml(transcriptExpanded ? "本场聊天记录" : winner.name + " 赢了") + '</h2></div><button class="result-close-button" type="button" data-close-result-button="true" aria-label="收起结算">×</button></header><div class="result-summary"><p>底分 ' + escapeHtml(result.bidScore) + " · 炸弹 " + escapeHtml(result.bombCount) + " · 最终倍数 " + escapeHtml(result.multiplier) + '</p><div class="result-score-grid">' +
       state.players.map(function (player) {
         return '<div class="result-score"><span>' + escapeHtml(player.name) + "</span><strong>" + escapeHtml(signed(result.scoreDelta[player.id])) + "</strong></div>";
       }).join("") +
-      '</div>' + renderMatchTranscript() + '<div class="result-actions">' + (state.phase === "match_end" ? '<button class="result-copy-button" type="button" data-copy-transcript="true">复制聊天记录</button>' : "") + '<button class="start-button" type="button" ' + (state.phase === "match_end" ? 'data-return-lobby="true">整场结束' : 'data-next-round="true">下一局') + "</button></div></section></div>"
+      '</div></div>' + renderMatchTranscript() + '<div class="result-actions">' + (state.phase === "match_end" ? '<button class="result-copy-button" type="button" data-copy-transcript="true">复制记录</button><button class="result-exit-button" type="button" data-exit-doudizhu="true">退出斗地主</button>' : "") + '<button class="start-button" type="button" ' + (state.phase === "match_end" ? 'data-return-lobby="true">返回大厅' : 'data-next-round="true">下一局') + "</button></div></section></div>"
     );
+  }
+
+  function renderResultReopen() {
+    if (resultOpen || !state.round || !state.round.result || ["round_end", "match_end"].indexOf(state.phase) < 0) return "";
+    return '<button class="result-reopen-button glass" type="button" data-open-result="true">查看' + (state.phase === "match_end" ? "本场" : "本局") + "结算</button>";
   }
 
   function renderInteractionDrawer() {
@@ -402,7 +414,7 @@
       state.players.map(renderSeat).join("") + renderCenter() + renderHand() + renderTurnActions() + renderFeedLine() + renderDissolveBanner() +
       '<button class="settings-button" type="button" data-open-settings="true" aria-label="斗地主设置">⚙</button>' +
       '<div class="table-tools"><button class="chat-button" type="button" data-open-chat="true" aria-label="对话"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8l-4.8 3v-3H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/><path d="M7.5 9.5h9M7.5 12.5h6"/></svg></button><button class="interaction-button" type="button" data-open-interaction="true" aria-label="表情与道具">☺</button></div>' +
-      renderSettingsPanel() + renderChatDrawer() + renderInteractionDrawer() + renderResultPanel() + "</div>"
+      renderSettingsPanel() + renderChatDrawer() + renderInteractionDrawer() + renderResultPanel() + renderResultReopen() + "</div>"
     );
   }
 
@@ -837,6 +849,7 @@
 
   function acceptSnapshot(next) {
     if (!next) return;
+    var previousPhase = state && state.phase;
     var newEvents = [];
     if (!seenInitialized) {
       (next.feed || []).forEach(function (event) { seenEvents.add(event.id); });
@@ -850,6 +863,14 @@
       });
     }
     state = next;
+    if (["round_end", "match_end"].indexOf(state.phase) >= 0 && previousPhase !== state.phase) {
+      resultOpen = true;
+      transcriptExpanded = false;
+    }
+    if (["round_end", "match_end"].indexOf(state.phase) < 0) {
+      resultOpen = true;
+      transcriptExpanded = false;
+    }
     var handIds = new Set((state.round && state.round.hand || []).map(function (card) { return card.id; }));
     Array.from(selectedCards).forEach(function (id) { if (!handIds.has(id)) selectedCards.delete(id); });
     render();
@@ -1078,6 +1099,29 @@
       copyMatchTranscript();
       return;
     }
+    if (button.hasAttribute("data-toggle-transcript")) {
+      transcriptExpanded = !transcriptExpanded;
+      render();
+      return;
+    }
+    if (button.hasAttribute("data-close-result-button")) {
+      resultOpen = false;
+      transcriptExpanded = false;
+      render();
+      return;
+    }
+    if (button.hasAttribute("data-open-result")) {
+      resultOpen = true;
+      render();
+      return;
+    }
+    if (button.hasAttribute("data-exit-doudizhu")) {
+      button.disabled = true;
+      postAction({ type: "return_lobby" }).catch(function () {}).finally(function () {
+        window.parent.postMessage({ type: "aevi:doudizhu-back" }, location.origin);
+      });
+      return;
+    }
     if (button.hasAttribute("data-return-lobby")) {
       postAction({ type: "return_lobby" }).catch(function () {});
     }
@@ -1094,6 +1138,11 @@
     }
     if (event.target.hasAttribute("data-close-chat")) {
       chatOpen = false;
+      render();
+    }
+    if (event.target.hasAttribute("data-close-result")) {
+      resultOpen = false;
+      transcriptExpanded = false;
       render();
     }
   });
