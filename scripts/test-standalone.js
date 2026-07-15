@@ -36,7 +36,14 @@ for (const [file, expected] of Object.entries(expectedMusicHashes)) {
 }
 
 const adapters = await fs.readFile("src/doudizhu-adapters.js", "utf8");
+const service = await fs.readFile("src/doudizhu-service.js", "utf8");
+const game = await fs.readFile("public/doudizhu/game.js", "utf8");
+const indexHtml = await fs.readFile("public/doudizhu/index.html", "utf8");
 assert.match(adapters, /scripts\/doudizhu-bot-adapter\.mjs/);
 assert.doesNotMatch(adapters, /doudizhu-(?:aevi|vex|juhua)-(?:adapter|client)/);
+assert.match(service, /ROUND_OPTIONS = \[4, 8, 16, 24\]/);
+assert.match(game, /\[4, 8, 16, 24\]\.map/);
+assert.match(game, /aevi_ddz_rounds"\) \|\| 4/);
+assert.match(indexHtml, /game\.js\?v=20260716ddz4round1/);
 
 console.log(`独立版检查通过：${required.length} 个关键文件与两首 MP3 完整。`);

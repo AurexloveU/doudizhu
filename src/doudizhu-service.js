@@ -21,7 +21,7 @@ import {
   sortCardIds,
 } from "./doudizhu-rules.js";
 
-const ROUND_OPTIONS = [8, 16, 24];
+const ROUND_OPTIONS = [4, 8, 16, 24];
 const EMOTES = Array.from({ length: 13 }, (_, index) => `emoji_${String(index + 1).padStart(2, "0")}`);
 const PROPS = ["tomato", "egg", "cheers"];
 const THEMES = ["jade", "sakura", "camp", "beach"];
@@ -429,7 +429,7 @@ export class DoudizhuService {
 
   async startMatch(totalRounds, selectedAiIds = ["aevi", "vex"]) {
     const rounds = Number(totalRounds);
-    if (!ROUND_OPTIONS.includes(rounds)) throw new Error("局数只能选择 8、16 或 24");
+    if (!ROUND_OPTIONS.includes(rounds)) throw new Error("局数只能选择 4、8、16 或 24");
     if (this.state.match && this.state.phase !== "match_end" && this.state.phase !== "lobby") throw new Error("当前牌局还没有结束");
     const aiIds = Array.isArray(selectedAiIds) ? selectedAiIds.map((id) => cleanText(id, 40)) : [];
     if (aiIds.length !== 2 || new Set(aiIds).size !== 2 || aiIds.some((id) => !["aevi", "vex", "juhua"].includes(id))) {

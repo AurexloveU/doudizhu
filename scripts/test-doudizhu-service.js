@@ -142,7 +142,7 @@ async function cleanup(service, dataDir) {
 {
   const { service, dataDir } = await createService();
   try {
-    await service.startMatch(8);
+    await service.startMatch(4);
     const compactPayload = service.aiPayload(service.state.round.currentPlayerId);
     assert.ok(compactPayload.hand.every((card) => typeof card === "string"), "AI 手牌只应发送紧凑牌 ID");
     assert.ok(compactPayload.landlord_cards.every((card) => typeof card === "string"), "底牌只应发送紧凑牌 ID");
@@ -152,7 +152,7 @@ async function cleanup(service, dataDir) {
     assert.equal("chat_recent" in compactPayload, false, "不得再发送完整聊天对象");
     assert.doesNotMatch(JSON.stringify(compactPayload), /\"(?:labels?|at)\"\s*:/, "AI 负载不得夹带展示字段和时间戳");
     assert.equal(service.state.phase, "bid");
-    assert.equal(service.state.match.totalRounds, 8);
+    assert.equal(service.state.match.totalRounds, 4);
     assert.deepEqual(Object.values(service.state.round.hands).map((hand) => hand.length), [17, 17, 17]);
     assert.equal(service.state.round.landlordCards.length, 3);
     const firstDealer = service.state.round.currentPlayerId;

@@ -22,7 +22,7 @@
   var targetId = "aevi";
   var cardGesture = null;
   var suppressCardClickUntil = 0;
-  var roundChoice = Number(localStorage.getItem("aevi_ddz_rounds") || 8);
+  var roundChoice = Number(localStorage.getItem("aevi_ddz_rounds") || 4);
   var musicVolume = clamp(Number(localStorage.getItem("aevi_ddz_music_volume") || 0.42), 0, 1);
   var effectVolume = clamp(Number(localStorage.getItem("aevi_ddz_effect_volume") || 0.74), 0, 1);
   var audioUnlocked = false;
@@ -38,7 +38,7 @@
     return ["aevi", "vex"];
   })();
 
-  if ([8, 16, 24].indexOf(roundChoice) < 0) roundChoice = 8;
+  if ([4, 8, 16, 24].indexOf(roundChoice) < 0) roundChoice = 4;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -305,7 +305,7 @@
         var tag = fixed ? "固定座位" : selected ? "已上桌" : "点选上桌";
         return '<button class="lobby-player' + (selected ? " selected" : "") + (fixed ? " fixed" : " selectable") + '" type="button" ' + (fixed ? "disabled" : 'data-ai-player="' + escapeAttr(player.id) + '"') + '><img src="' + escapeAttr(player.avatar) + '" alt="' + escapeAttr(player.name) + '"><strong>' + escapeHtml(player.name) + '</strong><span>' + tag + ' · 总分 ' + escapeHtml(signed(player.totalScore)) + "</span></button>";
       }).join("") +
-      '</div><div class="round-picker">' + [8, 16, 24].map(function (rounds) {
+      '</div><div class="round-picker">' + [4, 8, 16, 24].map(function (rounds) {
         return '<button class="round-option ' + (roundChoice === rounds ? "active" : "") + '" type="button" data-rounds="' + rounds + '">' + rounds + " 局</button>";
       }).join("") + '</div><button class="start-button" type="button" data-start="true" ' + (selectedAiIds.length === 2 ? "" : "disabled") + '>开桌</button><div class="leaderboard">' + (state.leaderboard || []).map(function (item, index) {
         return '<span>' + (index + 1) + '. <strong>' + escapeHtml(item.name) + "</strong> " + escapeHtml(signed(item.score)) + "</span>";
